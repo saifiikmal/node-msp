@@ -146,7 +146,7 @@ var messageCodes = {
   },
   105 : {
     name : 'MSP_RC',
-    size : 16,
+    size : 32, //previous was 16
     handler : function (parts) {
       var out = {
         type : 'MSP_RC',
@@ -164,16 +164,18 @@ var messageCodes = {
   },
   106 : {
     name : 'MSP_RAW_GPS',
-    size : 16,
+    size : 18, //previous was 16
     handler : function (parts) {
       var out = {
         type : 'MSP_RAW_GPS',
+        fix: parts[0],
         satellites : parts[1],
         latitude : utils.joinUints([parts[2], parts[3], parts[4], parts[5]]),
         longitude : utils.joinUints([parts[6], parts[7], parts[8], parts[9]]),
         altitude : utils.joinUints([parts[10], parts[11]]),
         speed : utils.joinUints([parts[12], parts[13]]),
-        heading : utils.joinUints([parts[14], parts[15]])
+        heading : utils.joinUints([parts[14], parts[15]]),
+        hdop: utils.joinUints([parts[16], parts[17]])
       };
       return out;
     }
@@ -212,12 +214,13 @@ var messageCodes = {
   },
   109 : {
     name : 'MSP_ALTITUDE',
-    size : 6,
+    size : 10, //updated for previous 6
     handler : function (parts) {
       var out = {
         type : 'MSP_ALTITUDE',
         estimatedAltitude : utils.joinUints([parts[0], parts[1], parts[2], parts[3]]), //In cm
-        variation : utils.joinUints([parts[4], parts[5]]) //cm per second
+        variation : utils.joinUints([parts[4], parts[5]]), //cm per second
+        barometer : utils.joinUints([parts[6], parts[7], parts[8], parts[9]])
       };
       return out;
     }
@@ -348,23 +351,69 @@ var messageCodes = {
   117 : undefined,
   118 : {
     name : 'MSP_WP',
-    size : 18,
+    size : 21,
+    builder : function (options, callback) {
+      if (options.wp_no == undefined) options.wp_no = 1;
+
+      var out = new Uint8Array(1);
+      out[0] = options.wp_no;
+
+      return out;
+    },
     handler : function (parts) {
       var out = {
         type : 'MSP_WP',
         number : parts[0],
-        latitude : utils.joinUints([parts[1], parts[2], parts[3], parts[4]]),
-        longitude : utils.joinUints([parts[5], parts[6], parts[7], parts[8]]),
-        altitude : utils.joinUints([parts[9], parts[10], parts[11], parts[12]]),
-        heading : utils.joinUints([parts[13], parts[14]]),
-        time : utils.joinUints([parts[15], parts[16]]),
-        navFlag : parts[17]
+        wp_type: parts[1],
+        latitude : utils.joinUints([parts[2], parts[3], parts[4], parts[5]]),
+        longitude : utils.joinUints([parts[6], parts[7], parts[8], parts[9]]),
+        altitude : utils.joinUints([parts[10], parts[11], parts[12], parts[13]]),
+        p1 : utils.joinUints([parts[14], parts[15]]),
+        p2 : utils.joinUints([parts[16], parts[17]]),
+        p3 : utils.joinUints([parts[18], parts[19]]),
+        flag : parts[20]
       };
       return out;
     }
   },
   119 : undefined,
   120 : undefined,
+  121 : {
+    name : 'MSP_NAV_STATUS',
+    size: 7,
+    handler: function(parts) {
+
+      var out = {
+        type : 'MSP_NAV_STATUS',
+        gps_mode : parts[0],
+        nav_state : parts[1],
+        action : parts[2],
+        wp_number : parts[3],
+        nav_error : parts[4],
+        target_bearing : utils.joinUints([parts[5], parts[6]])
+      }
+
+      return out;
+    }
+  },
+  150 : {
+    name : 'MSP_STATUS_EX',
+    size : 16,
+    handler: function (parts) {
+      var out = {
+        type : 'MSP_STATUS_EX',
+        cycle_time : utils.joinUints([parts[0], parts[1]]),
+        i2c_error : utils.joinUints([parts[2], parts[3]]),
+        active_sensors : utils.joinUints([parts[4], parts[5]]),
+        mode : utils.joinUints([parts[6], parts[7], parts[8], parts[9]]),
+        profile : parts[10],
+        cpu_load : utils.joinUints([parts[11], parts[12]]),
+        arming_flags : utils.joinUints([parts[13], parts[14]]),
+        calibration_flag : parts[15]
+      };
+      return out;
+    }
+  },
   //Inputs
   200 : {
     name : 'MSP_SET_RAW_RC',
@@ -404,13 +453,13 @@ var messageCodes = {
       out[2] = options.pitch[0];
       out[3] = options.pitch[1];
 
-      options.yaw = utils.splitUint(options.yaw);
-      out[4] = options.yaw[0];
-      out[5] = options.yaw[1];
-
       options.throttle = utils.splitUint(options.throttle);
-      out[6] = options.throttle[0];
-      out[7] = options.throttle[1];
+      out[4] = options.throttle[0];
+      out[5] = options.throttle[1];
+
+      options.yaw = utils.splitUint(options.yaw);
+      out[6] = options.yaw[0];
+      out[7] = options.yaw[1];
 
       for (var index = 0; index < 4; index++) {
         options.aux[index] = utils.splitUint(options.aux[index]);
@@ -602,49 +651,53 @@ var messageCodes = {
     name : 'MSP_SET_WP',
     builder : function (options, callback) {
       if (options.number == undefined) options.number = 0;
+      if (options.wp_type == undefined) options.wp_type = 0;
       if (options.latitude == undefined) options.latitude = 0;
       if (options.longitude == undefined) options.longitude = 0;
       if (options.altitude == undefined) options.altitude = 0;
-      if (options.heading == undefined) options.heading = 0;
-      if (options.time == undefined) options.time = 0;
+      if (options.p1 == undefined) options.p1 = 0;
+      if (options.p2 == undefined) options.p2 = 0;
+      if (options.p3 == undefined) options.p3 = 0;
 
-      if (options.navFlag == undefined) options.navFlag = true;
+      if (options.flag == undefined) options.flag = 165;
 
-      if (options.navFlag) options.navFlag = 1;
-      else options.navFlag = 0;
-
-      var out = new Uint8Array(18);
+      var out = new Uint8Array(21);
 
       out[0] = options.number;
+      out[1] = options.wp_type;
 
       options.latitude = utils.splitUint(options.latitude, 4);
       options.longitude = utils.splitUint(options.longitude, 4);
 
-      out[1] = options.latitude[0];
-      out[2] = options.latitude[1];
-      out[3] = options.latitude[2];
-      out[4] = options.latitude[3];
+      out[2] = options.latitude[0];
+      out[3] = options.latitude[1];
+      out[4] = options.latitude[2];
+      out[5] = options.latitude[3];
 
-      out[5] = options.longitude[0];
-      out[6] = options.longitude[1];
-      out[7] = options.longitude[2];
-      out[8] = options.longitude[3];
+      out[6] = options.longitude[0];
+      out[7] = options.longitude[1];
+      out[8] = options.longitude[2];
+      out[9] = options.longitude[3];
 
       options.altitude = utils.splitUint(options.altitude, 4);
-      out[9] = options.altitude[0];
-      out[10] = options.altitude[1];
-      out[11] = options.altitude[2];
-      out[12] = options.altitude[3];
+      out[10] = options.altitude[0];
+      out[11] = options.altitude[1];
+      out[12] = options.altitude[2];
+      out[13] = options.altitude[3];
 
-      options.heading = utils.splitUint(options.heading);
-      out[13] = options.heading[0];
-      out[14] = options.heading[1];
+      options.p1 = utils.splitUint(options.p1);
+      out[14] = options.p1[0];
+      out[15] = options.p1[1];
 
-      options.time = utils.splitUint(options.time);
-      out[15] = options.time[0];
-      out[16] = options.time[1];
+      options.p2 = utils.splitUint(options.p2);
+      out[16] = options.p2[0];
+      out[17] = options.p2[1];
 
-      out[17] = options.navFlag;
+      options.p3 = utils.splitUint(options.p3);
+      out[18] = options.p3[0];
+      out[19] = options.p3[1];
+
+      out[20] = options.flag;
 
       return out;
     }
@@ -746,6 +799,7 @@ var mspReader = function () {
   var position = 0;
   var messageLength;
   var xor = undefined;
+  var error = false;
 
   var message = {
     id : undefined,
@@ -753,6 +807,7 @@ var mspReader = function () {
   };
 
   this.handleBuffer = function (buffer) {
+    error = false;
     for (var index = 0; index < buffer.length; index++) {
       _self.handleData(buffer[index]);
     }
@@ -811,10 +866,17 @@ var mspReader = function () {
     }
   };
 
+  this.error = function() {
+    if(error)
+      return true
+
+    return false
+  };
+
   this.messageFail = function (message) {
     //console.log('Message failed - ', message);
-    _self.emit('error', message);
-
+    //_self.emit('error', message);
+    error = true
     //Reset the state to restart
     _self.changeState('header');
   };
